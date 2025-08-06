@@ -1,0 +1,40 @@
+name: Deploy WordPress to EC2 (LEMP)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: 📤 Upload WordPress Files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          source: "."                    # Upload everything
+          target: "/var/www/html/wordpress"
+
+      - name: 🔁 Restart NGINX and PHP
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            sudo chown -R www-data:www-data /var/www/html/wordpress
+            sudo chmod -R 755 /var/www/html/wordpress
+            sudo sed -i 's|root /var/www/html;|root /var/www/html/wordpress;|' /etc/nginx/sites-available/default
+            sudo nginx -t
+            sudo systemctl reload nginx
+            sudo systemctl restart php8.1-fpm
+            echo "✅ WordPress deployment complete!"
